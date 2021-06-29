@@ -1,0 +1,28 @@
+// create database
+create database company;
+
+create or replace database company;
+
+show databases like 'c%';
+
+use database demo_db;
+
+
+// create schema
+create or replace schema employee;
+create schema if not exists department;
+drop schema if exists department;
+
+show schemas like 'e%';
+
+use schema information_schema;
+use schema public;
+
+
+//create table
+create table EMPLOYEE.A(id number,
+               name varchar(20));
+
+create or replace table B(id number(32,5),
+               salary number,
+               department varchar(10));

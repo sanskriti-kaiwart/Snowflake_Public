@@ -1,0 +1,87 @@
+//SnowpPipe on Azure -Snowflake destination table setup
+
+CREATE DATABASE FINANCE;
+
+USE DATABASE FINANCE;
+
+CREATE SCHEMA STAGE;
+
+CREATE TABLE FINANCE.STAGE.BANK_TRANSACTIONS
+(
+TransactionNo INT,
+DateTime DATETIME,
+FromAccount INT,
+ToAccount INT,
+Amount NUMBER,
+TypeOfTransaction VARCHAR(20),
+TranDescription VARCHAR(200),
+Source VARCHAR(100)
+);
+
+
+insert INTO FINANCE.STAGE.BANK_TRANSACTIONS
+(TransactionNo,DateTime,FromAccount,ToAccount,Amount,TypeOfTransaction,TranDescription,Source)
+VALUES (1,TO_DATE('02/27/2020 09:57 AM','MM/DD/YYYY HH:MI AM'),360271,527296,3926.4,'Debit','adjustment','Chase');
+
+SELECT * FROM FINANCE.STAGE.BANK_TRANSACTIONS;
+
+
+
+truncate table FINANCE.STAGE.BANK_TRANSACTIONS;
+
+
+select *
+from table(information_schema.copy_history(table_name=>'BANK_TRANSACTIONS', start_time=> dateadd(hours, -1, current_timestamp())));
+
+
+-- SnowPipe - Azure  setup
+
+CREATE  NOTIFICATION INTEGRATION BANKING_SNOWPIPE_EVENT_NEW
+ENABLED =TRUE
+TYPE=QUEUE
+NOTIFICATION_PROVIDER=AZURE_STORAGE_QUEUE
+AZURE_STORAGE_QUEUE_PRIMARY_URI='https://snowflakesnowpipe1234.queue.core.windows.net/banking-data-queue'
+AZURE_TENANT_ID='42969e25-36f3-4b8c-930f-0df9751a8ce4';
+
+SHOW INTEGRATIONS;
+
+desc NOTIFICATION INTEGRATION BANKING_SNOWPIPE_EVENT_NEW;
+
+
+CREATE OR REPLACE STAGE BANK_TRANSACTIONS_STAGE
+url = 'azure://snowflakesnowpipe1234.blob.core.windows.net/banking-data-blob/'
+credentials = (azure_sas_token=
+'?sv=2020-02-10&ss=bfqt&srt=co&sp=rwlacx&se=2021-06-17T20:26:43Z&st=2021-06-17T12:26:43Z&spr=https&sig=3z2c2Sa23Q%2FfCFLo0fR78yFNQsqe1Qag1tIoVBlh1EQ%3D
+'
+);
+
+
+show stages;
+
+ls @BANK_TRANSACTIONS_STAGE;
+
+
+CREATE OR REPLACE pipe "BANK_TRANSACTIONS_PIPE"
+  auto_ingest = true
+  integration = 'BANKING_SNOWPIPE_EVENT_NEW'
+  as
+  copy into FINANCE.STAGE.BANK_TRANSACTIONS
+  from @BANK_TRANSACTIONS_STAGE
+  file_format = (type = 'CSV');
+
+
+
+CREATE OR REPLACE pipe "BANK_TRANSACTIONS_PIPE"
+  auto_ingest = true
+  integration = 'BANKING_SNOWPIPE_EVENT_NEW'
+  as
+  copy into FINANCE.STAGE.BANK_TRANSACTIONS
+(TransactionNo,DateTime,FromAccount,ToAccount,Amount,TypeOfTransaction,TranDescription,Source)
+ from (SELECT $1,TO_DATE($2,'MM/DD/YYYY HH:MI AM'),$3,$4,$5,$6,$7,$8  FROM @BANK_TRANSACTIONS_STAGE )
+  file_format = (type = 'CSV');
+
+SHOW pipes;
+
+ALTER PIPE BANK_TRANSACTIONS_PIPE REFRESH;
+
+select * from "FINANCE"."STAGE"."BANK_TRANSACTIONS"

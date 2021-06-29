@@ -1,0 +1,15 @@
+// create virtual warehouse
+create warehouse test;           
+create warehouse my_wh WAREHOUSE_SIZE = MEDIUM;
+
+-- To suspend a warehouse
+alter warehouse test suspend;
+
+-- To resume a warehouse
+alter warehouse test resume;
+
+-- list warehouses
+show warehouses;
+
+use warehouse compute_wh;
+use warehouse test;
